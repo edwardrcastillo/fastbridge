@@ -1,0 +1,4 @@
+build/
+debug.keystore
+*.idsig
+.DS_Store
