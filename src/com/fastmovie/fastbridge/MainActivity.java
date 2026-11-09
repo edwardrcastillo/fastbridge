@@ -28,6 +28,9 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -79,8 +82,7 @@ public class MainActivity extends Activity {
                 lastSelectedNameStack.clear();
                 refreshUi(null);
             } else if (ACTION_USB_PERMISSION.equals(action) || UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
-                BridgeService.tryMountAnyPermittedUsb(MainActivity.this);
-                refreshUi(null);
+                checkAndRequestUsbPermission(false);
             }
         }
     };
@@ -169,7 +171,7 @@ public class MainActivity extends Activity {
         refreshBtnView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                checkAndRequestUsbPermission();
+                checkAndRequestUsbPermission(true);
             }
         });
         header.addView(refreshBtnView);
@@ -299,7 +301,7 @@ public class MainActivity extends Activity {
             startService(svcIntent);
         }
 
-        checkAndRequestUsbPermission();
+        checkAndRequestUsbPermission(false);
     }
 
     private View createTopActionButton(String label) {
@@ -437,7 +439,7 @@ public class MainActivity extends Activity {
         return "ARCHIVO";
     }
 
-    private void checkAndRequestUsbPermission() {
+    private void checkAndRequestUsbPermission(boolean manualRescan) {
         UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         if (usbManager == null) {
             diskBadgeText.setText("  •  ❌ Error UsbManager");
@@ -445,26 +447,62 @@ public class MainActivity extends Activity {
         }
 
         HashMap<String, UsbDevice> devices = usbManager.getDeviceList();
-        UsbDevice target = null;
+        List<UsbDevice> allMassStorage = new ArrayList<UsbDevice>();
+        List<UsbDevice> candidates = new ArrayList<UsbDevice>();
+
         for (UsbDevice dev : devices.values()) {
             if (ScsiBlockDevice.isMassStorageDevice(dev)) {
-                target = dev;
-                break;
+                allMassStorage.add(dev);
+                if (!BridgeService.isKnownNonExfat(this, dev)) {
+                    candidates.add(dev);
+                }
             }
         }
 
-        if (target == null) {
-            diskBadgeText.setText("  •  ⚠️ Sin disco USB detectado");
+        // If user clicked manual rescan and all connected USB drives were previously marked non-exFAT,
+        // clear the cache in case the user reformatted one of the drives to exFAT.
+        if (candidates.isEmpty() && manualRescan && !allMassStorage.isEmpty() && BridgeService.getActiveVolume() == null) {
+            BridgeService.clearNonExfatCache(this);
+            candidates.addAll(allMassStorage);
+        }
+
+        if (candidates.isEmpty()) {
+            if (allMassStorage.isEmpty()) {
+                diskBadgeText.setText("  •  ⚠️ Sin disco USB exFAT detectado");
+            } else {
+                diskBadgeText.setText("  •  ℹ️ USB nativo detectado (esperando unidad exFAT)");
+            }
             return;
         }
 
-        if (usbManager.hasPermission(target)) {
+        // Prioritize known exFAT devices first
+        Collections.sort(candidates, new Comparator<UsbDevice>() {
+            @Override
+            public int compare(UsbDevice a, UsbDevice b) {
+                boolean aEx = BridgeService.isKnownExfat(MainActivity.this, a);
+                boolean bEx = BridgeService.isKnownExfat(MainActivity.this, b);
+                if (aEx == bEx) return 0;
+                return aEx ? -1 : 1;
+            }
+        });
+
+        boolean anyPermitted = false;
+        UsbDevice firstUnpermitted = null;
+        for (UsbDevice dev : candidates) {
+            if (usbManager.hasPermission(dev)) {
+                anyPermitted = true;
+            } else if (firstUnpermitted == null) {
+                firstUnpermitted = dev;
+            }
+        }
+
+        if (anyPermitted) {
             BridgeService.tryMountAnyPermittedUsb(this);
             refreshUi(null);
-        } else {
+        } else if (firstUnpermitted != null) {
             diskBadgeText.setText("  •  🔐 Solicitando permiso USB...");
             PendingIntent pi = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
-            usbManager.requestPermission(target, pi);
+            usbManager.requestPermission(firstUnpermitted, pi);
         }
     }
 
