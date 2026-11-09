@@ -9,6 +9,13 @@
   <i>Zero Root • Zero External Dependencies • 100% Read-Only Safe Hot-Unplug • 4K Hardware Direct Play via Kodi & HTTP Byte-Range</i>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Android%20TV%20(API%2021%2B)-38BDF8?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/Filesystem-exFAT%20%7C%20GPT%20%7C%20MBR-F59E0B?style=flat-square" alt="Filesystem" />
+  <img src="https://img.shields.io/badge/Transport-USB%20SCSI%20BOT%20%2B%20HTTP%20206-10B981?style=flat-square" alt="Transport" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="MIT License" /></a>
+</p>
+
 ---
 
 ## 🧠 1. Contexto y Motivación del Desarrollo
@@ -173,3 +180,10 @@ fastbridge/
     ├── BridgeService.java           # Servicio persistente Android TV + Hot-Plug / Hot-Unplug
     └── MainActivity.java            # Interfaz Android TV 10-Foot con foco Oro Ámbar e Inspector
 ```
+
+---
+
+## 📄 Licencia
+
+Este proyecto se distribuye bajo la **[Licencia MIT](LICENSE)** — Copyright (c) 2026 Edward Castillo.
+
